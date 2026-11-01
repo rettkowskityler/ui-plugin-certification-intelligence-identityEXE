@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "manifest": {
+    "alias": "certification-intelligence-identityexe",
+    "name": {
+      "en": "Certification Intelligence & Assurance Center"
+    },
+    "description": {
+      "en": "Multi-Campaign Executive War Room, Skip-Level Escalation Matrix, Rubber-Stamp Detector & Trust Score Analyzer, and Closed-Loop Revocation Assurance Engine for SailPoint Identity Security Cloud"
+    },
+    "apiScopes": [
+      "sp:scopes:all"
+    ],
+    "contentSecurityPolicies": {},
+    "permissionPolicy": {},
+    "iframeAllow": {},
+    "state": "ENABLED",
+    "slots": [
+      {
+        "slotId": "full-page"
+      }
+    ]
+  },
+  "build": {
+    "outDir": "./dist/certification-intelligence-identityexe/browser",
+    "port": 4200
+  }
+}

@@ -1,0 +1,1247 @@
+<div class="workbench">
+  <!-- LEFT SIDEBAR: ACTIVE CAMPAIGN RADAR & SCOPE SELECTOR -->
+  <aside class="campaign-sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title-row">
+        <span class="sidebar-label">
+          <i class="pi pi-shield"></i>
+          AUDIT CAMPAIGN SCOPE
+        </span>
+        <div class="sidebar-actions">
+          @if (certSvc.selectedCampaignIds().length > 0) {
+            <button
+              type="button"
+              class="btn-link"
+              (click)="clearCampaignFilter()"
+              pTooltip="Reset to All Campaigns"
+            >
+              Show All
+            </button>
+          }
+          <button
+            type="button"
+            class="icon-btn"
+            (click)="certSvc.loadFullCertificationIntelligence()"
+            [disabled]="certSvc.loading()"
+            pTooltip="Refresh Live Tenant Telemetry"
+          >
+            <i class="pi pi-refresh" [class.pi-spin]="certSvc.loading()"></i>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-subtext">
+        Select one or more campaigns to scope the War Room, Rubber-Stamp Detector, and Revocation Tracker.
+      </div>
+    </div>
+
+    <div class="campaign-list">
+      @for (camp of certSvc.campaigns(); track camp.id) {
+        <div
+          class="campaign-card"
+          [class.selected]="certSvc.selectedCampaignIds().includes(camp.id)"
+          [class.dimmed]="certSvc.selectedCampaignIds().length > 0 && !certSvc.selectedCampaignIds().includes(camp.id)"
+          (click)="toggleCampaignFilter(camp.id)"
+        >
+          <div class="camp-card-top">
+            <span
+              class="status-pill"
+              [class.status-active]="camp.status === 'ACTIVE'"
+              [class.status-staged]="camp.status === 'STAGED'"
+              [class.status-pending]="camp.status === 'PENDING'"
+              [class.status-completed]="camp.status === 'COMPLETED'"
+            >
+              {{ camp.status }}
+            </span>
+            <span class="type-badge">{{ camp.type }}</span>
+            <span
+              class="trust-chip"
+              [class.trust-high]="camp.trustScore >= 75"
+              [class.trust-warn]="camp.trustScore >= 40 && camp.trustScore < 75"
+              [class.trust-danger]="camp.trustScore < 40"
+              pTooltip="Average Reviewer Assurance Trust Score"
+            >
+              <i class="pi pi-verified"></i> Trust {{ camp.trustScore }}%
+            </span>
+          </div>
+
+          <h3 class="camp-name">{{ camp.name }}</h3>
+          <p class="camp-desc">{{ camp.description || 'Enterprise Certification Campaign' }}</p>
+
+          <div class="camp-progress-row">
+            <div class="progress-meta">
+              <span>Progress ({{ camp.decisionsMade }}/{{ camp.totalDecisions }} items)</span>
+              <strong>{{ camp.completionPct }}%</strong>
+            </div>
+            <div class="progress-bar-track">
+              <div
+                class="progress-bar-fill"
+                [style.width.%]="camp.completionPct"
+                [class.fill-good]="camp.completionPct >= 60"
+                [class.fill-warn]="camp.completionPct > 0 && camp.completionPct < 60"
+              ></div>
+            </div>
+          </div>
+
+          <div class="camp-metrics-grid">
+            <div class="mini-stat">
+              <span class="mini-val">{{ camp.totalCertifications }}</span>
+              <span class="mini-lbl">Reviewers</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-val text-green">{{ camp.approvedCount }}</span>
+              <span class="mini-lbl">Approved</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-val text-amber">{{ camp.revokedCount }}</span>
+              <span class="mini-lbl">Revoked</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-val" [class.text-red]="camp.rubberStampCount > 0">
+                {{ camp.rubberStampCount }}
+              </span>
+              <span class="mini-lbl">Rubber-Stamps</span>
+            </div>
+          </div>
+
+          <div class="camp-footer">
+            <span class="due-tag">
+              <i class="pi pi-clock"></i>
+              {{ camp.daysRemaining }}d left
+            </span>
+            <button
+              type="button"
+              class="mini-inspect-btn"
+              (click)="$event.stopPropagation(); inspectObject(camp.name, 'Campaign Summary DTO', camp)"
+            >
+              <i class="pi pi-code"></i> JSON
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </aside>
+
+  <!-- MAIN WORKSPACE -->
+  <section class="workspace-main">
+    <!-- TOP EXECUTIVE KPI RIBBON -->
+    @if (certSvc.executiveKpis(); as kpi) {
+      <div class="kpi-ribbon">
+        <div class="kpi-card">
+          <div class="kpi-icon icon-blue">
+            <i class="pi pi-chart-line"></i>
+          </div>
+          <div class="kpi-body">
+            <span class="kpi-label">PROGRAM COMPLETION VELOCITY</span>
+            <div class="kpi-value-row">
+              <span class="kpi-number">{{ kpi.completionPct }}%</span>
+              <span class="kpi-subBadge badge-cyan">
+                {{ kpi.decidedItems }} / {{ kpi.totalItems }} Decisions
+              </span>
+            </div>
+            <span class="kpi-caption">
+              {{ kpi.activeOrStagedCampaigns }} Active/Staged Campaigns &middot; {{ kpi.openItems }} Open Items
+            </span>
+          </div>
+        </div>
+
+        <div class="kpi-card" [class.kpi-alert-amber]="kpi.stalledReviewers > 0">
+          <div class="kpi-icon icon-amber">
+            <i class="pi pi-sitemap"></i>
+          </div>
+          <div class="kpi-body">
+            <span class="kpi-label">STALLED REVIEWERS (&lt;25% SLA)</span>
+            <div class="kpi-value-row">
+              <span class="kpi-number text-amber">{{ kpi.stalledReviewers }}</span>
+              <span class="kpi-subBadge badge-amber">
+                of {{ kpi.totalReviewers }} Reviewers
+              </span>
+            </div>
+            <span class="kpi-caption">
+              Ready for 1-Click Skip-Level Manager Escalation
+            </span>
+          </div>
+        </div>
+
+        <div class="kpi-card" [class.kpi-alert-red]="kpi.rubberStampers > 0">
+          <div class="kpi-icon icon-red">
+            <i class="pi pi-bolt"></i>
+          </div>
+          <div class="kpi-body">
+            <span class="kpi-label">RUBBER-STAMP RISK &amp; TRUST SCORE</span>
+            <div class="kpi-value-row">
+              <span class="kpi-number text-red">{{ kpi.rubberStampers }} Flagged</span>
+              <span class="kpi-subBadge badge-red">
+                {{ kpi.rubberStampedPrivilegedItems }} Priv Items
+              </span>
+            </div>
+            <span class="kpi-caption">
+              Avg Program Assurance Score: <strong>{{ kpi.avgTrustScore }}/100</strong>
+            </span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon icon-emerald">
+            <i class="pi pi-shield"></i>
+          </div>
+          <div class="kpi-body">
+            <span class="kpi-label">CLOSED-LOOP REVOCATION ASSURANCE</span>
+            <div class="kpi-value-row">
+              <span class="kpi-number text-emerald">{{ kpi.revokedItems }} Revokes</span>
+              <span class="kpi-subBadge badge-purple">
+                {{ kpi.zombieRevokes }} Zombie Re-Grants
+              </span>
+            </div>
+            <span class="kpi-caption">
+              {{ kpi.stuckRevokes }} Stuck Queue &middot; {{ kpi.verifiedRevokes }} Verified Clean
+            </span>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- NAVIGATION TABS & GLOBAL TOOLBAR -->
+    <div class="workspace-nav-bar">
+      <div class="nav-tabs">
+        <button
+          type="button"
+          class="nav-tab-btn"
+          [class.active]="activeTab() === 'WAR_ROOM'"
+          (click)="switchTab('WAR_ROOM')"
+        >
+          <i class="pi pi-compass"></i>
+          <span>1. Multi-Campaign War Room &amp; Skip-Level Escalation</span>
+          <span class="tab-badge">{{ certSvc.filteredReviewerRows().length }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="nav-tab-btn"
+          [class.active]="activeTab() === 'RUBBER_STAMP'"
+          (click)="switchTab('RUBBER_STAMP')"
+        >
+          <i class="pi pi-bolt"></i>
+          <span>2. Rubber-Stamp Detector &amp; Trust Analyzer</span>
+          <span class="tab-badge badge-danger">
+            {{ certSvc.executiveKpis().rubberStampers }} Alerts
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="nav-tab-btn"
+          [class.active]="activeTab() === 'REVOCATION_ASSURANCE'"
+          (click)="switchTab('REVOCATION_ASSURANCE')"
+        >
+          <i class="pi pi-check-circle"></i>
+          <span>3. Revocation Assurance &amp; Zombie-Access Tracker</span>
+          <span class="tab-badge badge-warn">
+            {{ certSvc.executiveKpis().revokedItems }} Revokes
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="nav-tab-btn"
+          [class.active]="activeTab() === 'API_TELEMETRY'"
+          (click)="switchTab('API_TELEMETRY')"
+        >
+          <i class="pi pi-server"></i>
+          <span>4. SailPoint V1 API Telemetry</span>
+          <span class="tab-badge">{{ apiLog.apiCount() }} Calls</span>
+        </button>
+      </div>
+
+      <div class="nav-actions">
+        <button
+          type="button"
+          class="btn-secondary"
+          (click)="exportAssuranceAuditPackCsv()"
+          pTooltip="Download Complete SOX/ISO Certification Assurance CSV Pack"
+        >
+          <i class="pi pi-download"></i>
+          <span>Export Audit Pack CSV</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ACTION RESULT BANNER -->
+    @if (actionBanner(); as banner) {
+      <div
+        class="action-alert-banner"
+        [class.banner-success]="banner.type === 'success'"
+        [class.banner-warn]="banner.type === 'warn'"
+      >
+        <div class="banner-left">
+          <i
+            class="pi"
+            [class.pi-check-circle]="banner.type === 'success'"
+            [class.pi-exclamation-triangle]="banner.type === 'warn'"
+          ></i>
+          <div class="banner-text">
+            <strong>{{ banner.title }}</strong>
+            <span>{{ banner.message }}</span>
+          </div>
+        </div>
+        <div class="banner-right">
+          <span class="banner-time">{{ banner.timestamp }}</span>
+          <button type="button" class="icon-btn" (click)="actionBanner.set(null)">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- LOADING OVERLAY BAR -->
+    @if (certSvc.loading()) {
+      <div class="loading-strip">
+        <div class="loading-strip-bar" [style.width.%]="certSvc.loadingProgress()"></div>
+        <span class="loading-strip-text">
+          <i class="pi pi-spin pi-spinner"></i> {{ certSvc.loadingMessage() }}
+        </span>
+      </div>
+    }
+
+    <!-- =========================================================================
+         TAB 1: MULTI-CAMPAIGN WAR ROOM & SKIP-LEVEL ESCALATION MATRIX
+         ========================================================================= -->
+    @if (activeTab() === 'WAR_ROOM') {
+      <div class="tab-panel">
+        <div class="panel-Control-header">
+          <div class="control-left">
+            <div class="search-input-wrap">
+              <i class="pi pi-search"></i>
+              <input
+                type="text"
+                placeholder="Search reviewer, department, skip-level manager, or campaign..."
+                [ngModel]="warRoomSearch()"
+                (ngModelChange)="warRoomSearch.set($event)"
+              />
+            </div>
+
+            <div class="filter-pills">
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="warRoomStatusFilter() === 'ALL'"
+                (click)="warRoomStatusFilter.set('ALL')"
+              >
+                All Reviewers ({{ certSvc.filteredReviewerRows().length }})
+              </button>
+              <button
+                type="button"
+                class="pill-btn pill-amber"
+                [class.active]="warRoomStatusFilter() === 'STALLED'"
+                (click)="warRoomStatusFilter.set('STALLED')"
+              >
+                <i class="pi pi-exclamation-circle"></i> Stalled &lt;25% ({{ certSvc.executiveKpis().stalledReviewers }})
+              </button>
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="warRoomStatusFilter() === 'IN_PROGRESS'"
+                (click)="warRoomStatusFilter.set('IN_PROGRESS')"
+              >
+                Active In-Progress
+              </button>
+            </div>
+          </div>
+
+          <div class="control-right">
+            <button
+              type="button"
+              class="btn-primary btn-glow-amber"
+              (click)="openSkipLevelEscalationModal()"
+            >
+              <i class="pi pi-forward"></i>
+              <span>1-Click Bulk Escalate Stalled Reviewers to Skip-Level Manager</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reviewer &amp; Department</th>
+                <th>Skip-Level Manager (Escalation Target)</th>
+                <th>Campaign &amp; Phase</th>
+                <th>Completion Progress</th>
+                <th>Decision Breakdown</th>
+                <th>Assurance Trust Score</th>
+                <th class="text-right">War Room Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of displayedWarRoomReviewers(); track row.certificationId) {
+                <tr [class.row-stalled]="row.phase === 'ACTIVE' && row.completionPct < 25">
+                  <td>
+                    <div class="identity-cell">
+                      <span class="avatar-circle">{{ row.reviewerName.slice(0, 2).toUpperCase() }}</span>
+                      <div class="identity-meta">
+                        <strong>{{ row.reviewerName }}</strong>
+                        <span>{{ row.reviewerDepartment }} &middot; {{ row.reviewerJobTitle }}</span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="skip-mgr-cell">
+                      <span class="mgr-badge">
+                        <i class="pi pi-sitemap"></i>
+                        {{ row.skipLevelManagerName }}
+                      </span>
+                      <span class="mgr-sub">{{ row.skipLevelManagerEmail }}</span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="camp-cell">
+                      <strong>{{ row.campaignName }}</strong>
+                      <div class="camp-badges">
+                        <span
+                          class="phase-badge"
+                          [class.phase-active]="row.phase === 'ACTIVE'"
+                          [class.phase-staged]="row.phase === 'STAGED'"
+                        >
+                          {{ row.phase }}
+                        </span>
+                        <span class="days-badge">{{ row.daysRemaining }}d remaining</span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="completion-cell">
+                      <div class="comp-top">
+                        <strong>{{ row.completionPct }}%</strong>
+                        <span>{{ row.decisionsMade }} / {{ row.decisionsTotal }} items</span>
+                      </div>
+                      <div class="comp-bar">
+                        <div
+                          class="comp-fill"
+                          [style.width.%]="row.completionPct"
+                          [class.fill-stalled]="row.completionPct < 25"
+                          [class.fill-good]="row.completionPct >= 60"
+                        ></div>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="decision-pills">
+                      <span class="d-pill d-approve" pTooltip="Approved Items">
+                        ✓ {{ row.approvedCount }}
+                      </span>
+                      <span class="d-pill d-revoke" pTooltip="Revoked Items">
+                        ✕ {{ row.revokedCount }}
+                      </span>
+                      <span class="d-pill d-open" pTooltip="Open Undecided Items">
+                        ○ {{ row.openItemsCount }}
+                      </span>
+                      @if (row.privilegedCount > 0) {
+                        <span class="d-pill d-priv" pTooltip="Privileged Access Items in Scope">
+                          <i class="pi pi-lock"></i> {{ row.privilegedCount }} Priv
+                        </span>
+                      }
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="trust-cell">
+                      <span
+                        class="trust-badge"
+                        [class.trust-critical]="row.trustLevel === 'CRITICAL_RUBBER_STAMP'"
+                        [class.trust-high]="row.trustLevel === 'HIGH_ASSURANCE'"
+                        [class.trust-pending]="row.trustLevel === 'PENDING_REVIEW'"
+                      >
+                        @if (row.trustLevel === 'CRITICAL_RUBBER_STAMP') {
+                          <i class="pi pi-exclamation-triangle"></i>
+                          RUBBER-STAMP ({{ row.trustScore }}/100)
+                        } @else if (row.trustLevel === 'HIGH_ASSURANCE') {
+                          <i class="pi pi-verified"></i>
+                          HIGH TRUST ({{ row.trustScore }}/100)
+                        } @else {
+                          <i class="pi pi-clock"></i>
+                          AWAITING REVIEW
+                        }
+                      </span>
+                      @if (row.decisionsMade > 0) {
+                        <span class="velocity-sub">
+                          {{ row.decisionsPerMinute }} items/min &middot; {{ row.commentCoveragePct }}% commented
+                        </span>
+                      }
+                    </div>
+                  </td>
+
+                  <td class="text-right">
+                    <div class="row-actions">
+                      @if (row.openItemsCount > 0 && row.phase === 'ACTIVE') {
+                        <button
+                          type="button"
+                          class="btn-action btn-amber"
+                          (click)="openSkipLevelEscalationModal(row)"
+                          pTooltip="Reassign Open Items to Skip-Level Manager via /certifications/v1/{id}/reassign"
+                        >
+                          <i class="pi pi-forward"></i> Escalate ({{ row.openItemsCount }})
+                        </button>
+                      }
+                      @if (row.trustLevel === 'CRITICAL_RUBBER_STAMP') {
+                        <button
+                          type="button"
+                          class="btn-action btn-red"
+                          (click)="switchTab('RUBBER_STAMP'); selectedRubberStampCertId.set(row.certificationId)"
+                          pTooltip="Inspect Rubber-Stamped Decisions"
+                        >
+                          <i class="pi pi-search-plus"></i> Audit Stamp
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        (click)="inspectObject(row.reviewerName, row.campaignName, row)"
+                        pTooltip="Inspect Certification Telemetry JSON"
+                      >
+                        <i class="pi pi-eye"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- =========================================================================
+         TAB 2: RUBBER-STAMP DETECTOR & CERTIFICATION TRUST SCORE ANALYZER
+         ========================================================================= -->
+    @if (activeTab() === 'RUBBER_STAMP') {
+      <div class="tab-panel">
+        <!-- REVIEWER TELEMETRY COMPARISON CARDS -->
+        <div class="telemetry-cards-strip">
+          @for (rev of displayedRubberStampReviewers(); track rev.certificationId) {
+            <div
+              class="telemetry-card"
+              [class.card-rubber-stamp]="rev.trustLevel === 'CRITICAL_RUBBER_STAMP'"
+              [class.card-high-trust]="rev.trustLevel === 'HIGH_ASSURANCE'"
+              [class.card-selected]="selectedRubberStampCertId() === rev.certificationId"
+              (click)="selectedRubberStampCertId.set(selectedRubberStampCertId() === rev.certificationId ? null : rev.certificationId)"
+            >
+              <div class="t-card-header">
+                <div class="t-reviewer">
+                  <strong>{{ rev.reviewerName }}</strong>
+                  <span>{{ rev.campaignName }}</span>
+                </div>
+                <div
+                  class="t-score-ring"
+                  [class.ring-danger]="rev.trustLevel === 'CRITICAL_RUBBER_STAMP'"
+                  [class.ring-safe]="rev.trustLevel === 'HIGH_ASSURANCE'"
+                >
+                  <span class="score-num">{{ rev.trustScore }}</span>
+                  <span class="score-lbl">TRUST</span>
+                </div>
+              </div>
+
+              <div class="t-metrics-row">
+                <div class="t-metric">
+                  <span class="tm-val">{{ rev.decisionsPerMinute }}/min</span>
+                  <span class="tm-lbl">Velocity ({{ rev.estimatedReviewDurationSec }}s)</span>
+                </div>
+                <div class="t-metric">
+                  <span class="tm-val" [class.text-red]="rev.approvalRatePct === 100">
+                    {{ rev.approvalRatePct }}%
+                  </span>
+                  <span class="tm-lbl">Approval Rate</span>
+                </div>
+                <div class="t-metric">
+                  <span class="tm-val" [class.text-red]="rev.commentCoveragePct === 0">
+                    {{ rev.commentCoveragePct }}%
+                  </span>
+                  <span class="tm-lbl">Commented</span>
+                </div>
+                <div class="t-metric">
+                  <span class="tm-val text-amber">{{ rev.privilegedApprovedNoCommentCount }}</span>
+                  <span class="tm-lbl">Uncommented Priv</span>
+                </div>
+              </div>
+
+              <div class="t-flags">
+                @for (flag of rev.trustFlags; track flag) {
+                  <span
+                    class="flag-chip"
+                    [class.chip-red]="rev.trustLevel === 'CRITICAL_RUBBER_STAMP'"
+                    [class.chip-green]="rev.trustLevel === 'HIGH_ASSURANCE'"
+                  >
+                    {{ flag }}
+                  </span>
+                }
+              </div>
+
+              @if (rev.trustLevel === 'CRITICAL_RUBBER_STAMP') {
+                <div class="t-card-footer">
+                  <button
+                    type="button"
+                    class="btn-micro-audit"
+                    (click)="$event.stopPropagation(); openSurgicalMicroCampaignModal(rev)"
+                  >
+                    <i class="pi pi-replay"></i>
+                    Spawn 2nd-Level Micro-Campaign ({{ rev.privilegedApprovedNoCommentCount }} Priv Items)
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- RUBBER-STAMP LINE-ITEM INSPECTOR -->
+        <div class="panel-Control-header">
+          <div class="control-left">
+            <div class="search-input-wrap">
+              <i class="pi pi-search"></i>
+              <input
+                type="text"
+                placeholder="Filter approved items by reviewer, target identity, entitlement, or source..."
+                [ngModel]="rubberStampSearch()"
+                (ngModelChange)="rubberStampSearch.set($event)"
+              />
+            </div>
+
+            <div class="filter-pills">
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="rubberStampFilter() === 'ALL'"
+                (click)="rubberStampFilter.set('ALL')"
+              >
+                All Approved Items
+              </button>
+              <button
+                type="button"
+                class="pill-btn pill-red"
+                [class.active]="rubberStampFilter() === 'CRITICAL_RUBBER_STAMP'"
+                (click)="rubberStampFilter.set('CRITICAL_RUBBER_STAMP')"
+              >
+                <i class="pi pi-bolt"></i> Flagged Rubber-Stamped Only
+              </button>
+              <button
+                type="button"
+                class="pill-btn pill-amber"
+                [class.active]="rubberStampFilter() === 'PRIVILEGED_ONLY'"
+                (click)="rubberStampFilter.set('PRIVILEGED_ONLY')"
+              >
+                <i class="pi pi-lock"></i> Privileged Uncommented Approvals
+              </button>
+              @if (selectedRubberStampCertId()) {
+                <button
+                  type="button"
+                  class="pill-btn"
+                  (click)="selectedRubberStampCertId.set(null)"
+                >
+                  ✕ Clear Reviewer Filter
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="control-right">
+            <button
+              type="button"
+              class="btn-primary btn-glow-red"
+              (click)="openSurgicalMicroCampaignModal()"
+            >
+              <i class="pi pi-send"></i>
+              <span>1-Click Launch Second-Level Audit Micro-Campaign ({{ rubberStampedPrivilegedItemsList().length }} Priv Items)</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reviewer &amp; Scrutiny</th>
+                <th>Target Identity</th>
+                <th>Approved Access Item &amp; Source</th>
+                <th>Privilege Risk</th>
+                <th>Decision Telemetry</th>
+                <th>Reviewer Comment</th>
+                <th class="text-right">Remediation Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of displayedRubberStampItems(); track item.itemId) {
+                <tr [class.row-rubber-stamp]="item.isRubberStamped && item.privileged">
+                  <td>
+                    <div class="reviewer-col">
+                      <strong>{{ item.reviewerName }}</strong>
+                      <span class="sub-camp">{{ item.campaignName }}</span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="target-col">
+                      <strong>{{ item.targetIdentityName }}</strong>
+                      <span>{{ item.targetDepartment }}</span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="access-col">
+                      <div class="acc-title-row">
+                        <span class="acc-type-chip">{{ item.accessType }}</span>
+                        <strong>{{ item.accessName }}</strong>
+                      </div>
+                      <span class="acc-source">
+                        <i class="pi pi-database"></i> {{ item.sourceName }} &middot; {{ item.accessDescription }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td>
+                    @if (item.privileged) {
+                      <span class="priv-pill priv-high">
+                        <i class="pi pi-lock"></i> PRIVILEGED
+                      </span>
+                    } @else {
+                      <span class="priv-pill priv-std">Standard</span>
+                    }
+                  </td>
+
+                  <td>
+                    @if (item.isRubberStamped) {
+                      <span class="stamp-alert-badge">
+                        <i class="pi pi-bolt"></i> BULK RUBBER-STAMPED
+                      </span>
+                    } @else {
+                      <span class="stamp-verified-badge">
+                        <i class="pi pi-check"></i> Individual Review
+                      </span>
+                    }
+                  </td>
+
+                  <td>
+                    @if (item.comments) {
+                      <span class="comment-quote">"{{ item.comments }}"</span>
+                    } @else {
+                      <span class="no-comment-warn">No justification comment recorded</span>
+                    }
+                  </td>
+
+                  <td class="text-right">
+                    <div class="row-actions">
+                      @if (item.revocable) {
+                        <button
+                          type="button"
+                          class="btn-action btn-red"
+                          (click)="triggerSurgicalRevoke(item)"
+                          [disabled]="certSvc.actionBusy()"
+                          pTooltip="Override Rubber-Stamp Approval and Flip to REVOKE via /certifications/v1/{id}/decide"
+                        >
+                          <i class="pi pi-ban"></i> Override &amp; Revoke
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        (click)="inspectObject(item.accessName, item.targetIdentityName, item)"
+                      >
+                        <i class="pi pi-eye"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- =========================================================================
+         TAB 3: POST-CAMPAIGN REVOCATION ASSURANCE & ZOMBIE-ACCESS TRACKER
+         ========================================================================= -->
+    @if (activeTab() === 'REVOCATION_ASSURANCE') {
+      <div class="tab-panel">
+        <!-- CLOSED-LOOP ASSURANCE FUNNEL CARDS -->
+        <div class="assurance-funnel-grid">
+          <div
+            class="funnel-card funnel-zombie"
+            [class.active]="revocationStateFilter() === 'ZOMBIE_REGRANTED'"
+            (click)="revocationStateFilter.set(revocationStateFilter() === 'ZOMBIE_REGRANTED' ? 'ALL' : 'ZOMBIE_REGRANTED')"
+          >
+            <div class="f-top">
+              <span class="f-title">🚨 ZOMBIE RE-GRANTED ACCESS</span>
+              <span class="f-count">{{ certSvc.executiveKpis().zombieRevokes }}</span>
+            </div>
+            <p class="f-desc">
+              Reviewer clicked <strong>REVOKE</strong>, but dynamic Birthright / Role Criteria on the identity still matches and immediately re-grants the access!
+            </p>
+          </div>
+
+          <div
+            class="funnel-card funnel-stuck"
+            [class.active]="revocationStateFilter() === 'STUCK_PROVISIONING'"
+            (click)="revocationStateFilter.set(revocationStateFilter() === 'STUCK_PROVISIONING' ? 'ALL' : 'STUCK_PROVISIONING')"
+          >
+            <div class="f-top">
+              <span class="f-title">⚠️ STUCK IN CONNECTOR / TICKET QUEUE</span>
+              <span class="f-count">{{ certSvc.executiveKpis().stuckRevokes }}</span>
+            </div>
+            <p class="f-desc">
+              Revocation decision recorded, but live <code>/search/v1</code> verification shows the entitlement is still present on the target source account.
+            </p>
+          </div>
+
+          <div
+            class="funnel-card funnel-verified"
+            [class.active]="revocationStateFilter() === 'VERIFIED_REMOVED'"
+            (click)="revocationStateFilter.set(revocationStateFilter() === 'VERIFIED_REMOVED' ? 'ALL' : 'VERIFIED_REMOVED')"
+          >
+            <div class="f-top">
+              <span class="f-title">✅ VERIFIED REMOVED ON ENDPOINT</span>
+              <span class="f-count">{{ certSvc.executiveKpis().verifiedRevokes }}</span>
+            </div>
+            <p class="f-desc">
+              Closed-loop endpoint check confirmed 0 active assignments remaining on the identity cube. Ready for auditor sign-off.
+            </p>
+          </div>
+        </div>
+
+        <div class="panel-Control-header">
+          <div class="control-left">
+            <div class="search-input-wrap">
+              <i class="pi pi-search"></i>
+              <input
+                type="text"
+                placeholder="Search revoked items by target identity, access item, granting role, or source..."
+                [ngModel]="revocationSearch()"
+                (ngModelChange)="revocationSearch.set($event)"
+              />
+            </div>
+
+            <div class="filter-pills">
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="revocationStateFilter() === 'ALL'"
+                (click)="revocationStateFilter.set('ALL')"
+              >
+                All Revocation Decisions ({{ certSvc.executiveKpis().revokedItems }})
+              </button>
+              <button
+                type="button"
+                class="pill-btn pill-red"
+                [class.active]="revocationStateFilter() === 'ZOMBIE_REGRANTED'"
+                (click)="revocationStateFilter.set('ZOMBIE_REGRANTED')"
+              >
+                Zombie Re-Grants ({{ certSvc.executiveKpis().zombieRevokes }})
+              </button>
+              <button
+                type="button"
+                class="pill-btn pill-amber"
+                [class.active]="revocationStateFilter() === 'STUCK_PROVISIONING'"
+                (click)="revocationStateFilter.set('STUCK_PROVISIONING')"
+              >
+                Stuck Queue ({{ certSvc.executiveKpis().stuckRevokes }})
+              </button>
+              <button
+                type="button"
+                class="pill-btn"
+                [class.active]="revocationStateFilter() === 'VERIFIED_REMOVED'"
+                (click)="revocationStateFilter.set('VERIFIED_REMOVED')"
+              >
+                Verified Clean ({{ certSvc.executiveKpis().verifiedRevokes }})
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Target Identity</th>
+                <th>Revoked Access Item &amp; Source</th>
+                <th>Reviewer &amp; Audit Comment</th>
+                <th>Live Endpoint Verification Status</th>
+                <th>Root Cause &amp; Remediation Diagnosis</th>
+                <th class="text-right">Closed-Loop Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of displayedRevocationItems(); track item.itemId) {
+                <tr
+                  [class.row-zombie]="item.revocationState === 'ZOMBIE_REGRANTED'"
+                  [class.row-stuck]="item.revocationState === 'STUCK_PROVISIONING'"
+                >
+                  <td>
+                    <div class="target-col">
+                      <strong>{{ item.targetIdentityName }}</strong>
+                      <span>{{ item.targetDepartment }}</span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="access-col">
+                      <div class="acc-title-row">
+                        <span class="acc-type-chip">{{ item.accessType }}</span>
+                        <strong>{{ item.accessName }}</strong>
+                      </div>
+                      <span class="acc-source">
+                        <i class="pi pi-database"></i> {{ item.sourceName }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="reviewer-col">
+                      <strong>Revoked by {{ item.reviewerName }}</strong>
+                      <span class="comment-quote">"{{ item.comments || 'Revoked during audit review' }}"</span>
+                    </div>
+                  </td>
+
+                  <td>
+                    @if (item.revocationState === 'ZOMBIE_REGRANTED') {
+                      <span class="rev-badge rev-zombie">
+                        <i class="pi pi-Sync"></i> ZOMBIE RE-GRANTED (STILL ACTIVE)
+                      </span>
+                    } @else if (item.revocationState === 'STUCK_PROVISIONING') {
+                      <span class="rev-badge rev-stuck">
+                        <i class="pi pi-exclamation-triangle"></i> STUCK IN PROVISIONING
+                      </span>
+                    } @else if (item.revocationState === 'VERIFIED_REMOVED') {
+                      <span class="rev-badge rev-verified">
+                        <i class="pi pi-check-circle"></i> VERIFIED REMOVED
+                      </span>
+                    } @else {
+                      <span class="rev-badge rev-pending">
+                        <i class="pi pi-clock"></i> PENDING CAMPAIGN SIGN-OFF
+                      </span>
+                    }
+                    <div class="sub-cause">{{ item.grantingRoleOrSource }}</div>
+                  </td>
+
+                  <td>
+                    <p class="remediation-text">{{ item.remediationAdvice }}</p>
+                  </td>
+
+                  <td class="text-right">
+                    <div class="row-actions">
+                      @if (item.revocationState !== 'VERIFIED_REMOVED') {
+                        <button
+                          type="button"
+                          class="btn-action btn-amber"
+                          (click)="triggerSurgicalRevoke(item)"
+                          [disabled]="certSvc.actionBusy()"
+                          pTooltip="Dispatch Direct Access Revocation Request (/access-requests/v1) & Verify Removal"
+                        >
+                          <i class="pi pi-bolt"></i> Force Surgical Revoke
+                        </button>
+                      } @else {
+                        <span class="verified-check">
+                          <i class="pi pi-verified"></i> Enforced
+                        </span>
+                      }
+                      <button
+                        type="button"
+                        class="icon-btn"
+                        (click)="inspectObject(item.accessName, 'Revocation Verification Trace', item)"
+                      >
+                        <i class="pi pi-eye"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- =========================================================================
+         TAB 4: SAILPOINT V1 API TELEMETRY & CURL INSPECTOR
+         ========================================================================= -->
+    @if (activeTab() === 'API_TELEMETRY') {
+      <div class="tab-panel telemetry-split-layout">
+        <div class="telemetry-list-pane">
+          <div class="telemetry-toolbar">
+            <div class="t-stats">
+              <span class="t-pill">{{ apiLog.apiCount() }} Calls</span>
+              <span class="t-pill text-green">{{ apiLog.successCount() }} 2xx OK</span>
+              <span class="t-pill">Avg {{ apiLog.averageDurationMs() }}ms</span>
+            </div>
+            <div class="t-actions">
+              <button type="button" class="btn-secondary" (click)="apiLog.exportLogsJson()">
+                <i class="pi pi-download"></i> Export JSON
+              </button>
+              <button type="button" class="btn-secondary" (click)="apiLog.clearLogs()">
+                <i class="pi pi-trash"></i> Clear
+              </button>
+            </div>
+          </div>
+
+          <div class="api-entries-scroll">
+            @for (entry of apiLog.filteredLogs(); track entry.id) {
+              @if (entry.type === 'api') {
+                <div
+                  class="api-entry-row"
+                  [class.selected]="apiLog.selectedLogId() === entry.id"
+                  (click)="apiLog.selectLog(entry.id)"
+                >
+                  <span class="http-method" [attr.data-method]="entry.method">{{ entry.method }}</span>
+                  <span class="http-path font-mono">{{ entry.path }}</span>
+                  <span
+                    class="http-status"
+                    [class.status-ok]="entry.status >= 200 && entry.status < 300"
+                    [class.status-err]="entry.status >= 400"
+                  >
+                    {{ entry.status }}
+                  </span>
+                  <span class="http-ms">{{ entry.durationMs }}ms</span>
+                </div>
+              }
+            }
+          </div>
+        </div>
+
+        <div class="telemetry-detail-pane">
+          @if (apiLog.selectedLog(); as sel) {
+            @if (sel.type === 'api') {
+              <div class="detail-header">
+                <div class="detail-url font-mono">
+                  <strong>{{ sel.method }}</strong> {{ sel.path }}
+                </div>
+                <div class="detail-btns">
+                  <button type="button" class="btn-secondary" (click)="copyText(sel.curl)">
+                    <i class="pi pi-copy"></i> Copy cURL
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    (click)="copyText(formatJson(sel.responseBody))"
+                  >
+                    <i class="pi pi-code"></i> Copy Response JSON
+                  </button>
+                </div>
+              </div>
+
+              <div class="detail-code-blocks">
+                <div class="code-section">
+                  <h4>cURL Command</h4>
+                  <pre class="font-mono">{{ sel.curl }}</pre>
+                </div>
+                @if (sel.requestBody) {
+                  <div class="code-section">
+                    <h4>Request Payload</h4>
+                    <pre class="font-mono">{{ formatJson(sel.requestBody) }}</pre>
+                  </div>
+                }
+                <div class="code-section">
+                  <h4>Response Payload ({{ sel.status }} {{ sel.statusText }})</h4>
+                  <pre class="font-mono">{{ formatJson(sel.responseBody) }}</pre>
+                </div>
+              </div>
+            }
+          } @else {
+            <div class="empty-telemetry">
+              Select any API request on the left to inspect its payload and cURL command.
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </section>
+</div>
+
+<!-- =========================================================================
+     MODAL 1: 1-CLICK SKIP-LEVEL MANAGER ESCALATION PREVIEW MODAL
+     ========================================================================= -->
+@if (showEscalationModal()) {
+  <div class="modal-backdrop" (click)="showEscalationModal.set(false)">
+    <div class="modal-dialog" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>
+            <i class="pi pi-forward text-amber"></i>
+            1-Click Skip-Level Manager Escalation Matrix
+          </h3>
+          <p>
+            Automatically resolves each stalled reviewer's <code>manager</code> from the Identity Cube and bulk-reassigns undecided certification items via <code>POST /certifications/v1/&#123;id&#125;/reassign</code>.
+          </p>
+        </div>
+        <button type="button" class="icon-btn" (click)="showEscalationModal.set(false)">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Audit Escalation Reason Comment (Appended to Certification Reassignment Trail)</label>
+          <input
+            type="text"
+            class="modal-input"
+            [ngModel]="escalationReason()"
+            (ngModelChange)="escalationReason.set($event)"
+          />
+        </div>
+
+        <div class="escalation-preview-list">
+          @for (cand of escalationCandidateList(); track cand.certificationId) {
+            <div class="esc-preview-row">
+              <div class="esc-from">
+                <span class="esc-lbl">STALLED REVIEWER</span>
+                <strong>{{ cand.fromReviewerName }}</strong>
+                <span class="esc-camp">{{ cand.campaignName }}</span>
+              </div>
+              <div class="esc-arrow">
+                <span class="items-pill">{{ cand.openItemsToReassign }} Open Items</span>
+                <i class="pi pi-arrow-right"></i>
+              </div>
+              <div class="esc-to">
+                <span class="esc-lbl">SKIP-LEVEL MANAGER (NEW REVIEWER)</span>
+                <strong class="text-cyan">{{ cand.toSkipManagerName }}</strong>
+                <span class="esc-camp font-mono">ID: {{ cand.toSkipManagerId }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="showEscalationModal.set(false)">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="btn-primary btn-glow-amber"
+          [disabled]="certSvc.actionBusy() || escalationCandidateList().length === 0"
+          (click)="confirmSkipLevelEscalation()"
+        >
+          <i class="pi pi-check"></i>
+          <span>Confirm &amp; Dispatch Skip-Level Escalations ({{ escalationCandidateList().length }} Reviewers)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- =========================================================================
+     MODAL 2: 1-CLICK SURGICAL SECOND-LEVEL RE-CERTIFICATION CAMPAIGN LAUNCHER
+     ========================================================================= -->
+@if (showMicroCampaignModal()) {
+  <div class="modal-backdrop" (click)="showMicroCampaignModal.set(false)">
+    <div class="modal-dialog" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>
+            <i class="pi pi-bolt text-red"></i>
+            Spawn Surgical Second-Level Re-Certification Campaign
+          </h3>
+          <p>
+            Stages a targeted Search-Based Micro-Campaign (<code>POST /campaigns/v1</code>) isolating privileged items that were bulk rubber-stamped without comments, enforcing <code>mandatoryCommentRequirement: ALL_DECISIONS</code>.
+          </p>
+        </div>
+        <button type="button" class="icon-btn" (click)="showMicroCampaignModal.set(false)">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Micro-Campaign Name</label>
+            <input
+              type="text"
+              class="modal-input"
+              [ngModel]="microCampaignName()"
+              (ngModelChange)="microCampaignName.set($event)"
+            />
+          </div>
+          <div class="form-group">
+            <label>Second-Level Audit Reviewer (Security / Governance Lead)</label>
+            <input
+              type="text"
+              class="modal-input"
+              [ngModel]="microCampaignReviewerName()"
+              (ngModelChange)="microCampaignReviewerName.set($event)"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Audit Scope Description</label>
+          <input
+            type="text"
+            class="modal-input"
+            [ngModel]="microCampaignDescription()"
+            (ngModelChange)="microCampaignDescription.set($event)"
+          />
+        </div>
+
+        <div class="micro-scope-box">
+          <div class="scope-stat">
+            <span class="s-num text-red">{{ rubberStampedPrivilegedItemsList().length }}</span>
+            <span class="s-lbl">Flagged Privileged Items</span>
+          </div>
+          <div class="scope-stat">
+            <span class="s-num text-cyan">ALL_DECISIONS</span>
+            <span class="s-lbl">Mandatory Comment Policy</span>
+          </div>
+          <div class="scope-stat">
+            <span class="s-num">{{ microCampaignDeadlineDays() }} Days</span>
+            <span class="s-lbl">Expedited Audit SLA</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="showMicroCampaignModal.set(false)">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="btn-primary btn-glow-red"
+          [disabled]="certSvc.actionBusy()"
+          (click)="confirmLaunchMicroCampaign()"
+        >
+          <i class="pi pi-send"></i>
+          <span>Stage Second-Level Micro-Campaign in ISC</span>
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- =========================================================================
+     MODAL 3: RAW JSON PAYLOAD INSPECTOR
+     ========================================================================= -->
+@if (inspectedJsonItem(); as insp) {
+  <div class="modal-backdrop" (click)="inspectedJsonItem.set(null)">
+    <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>{{ insp.title }}</h3>
+          <p>{{ insp.subtitle }}</p>
+        </div>
+        <div class="row-actions">
+          <button
+            type="button"
+            class="btn-secondary"
+            (click)="copyText(formatJson(insp.payload))"
+          >
+            <i class="pi pi-copy"></i> Copy JSON
+          </button>
+          <button type="button" class="icon-btn" (click)="inspectedJsonItem.set(null)">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <pre class="json-viewer font-mono">{{ formatJson(insp.payload) }}</pre>
+      </div>
+    </div>
+  </div>
+}
